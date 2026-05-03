@@ -1,0 +1,32 @@
+# TODO: Verify CPU topology on cnfdr26/cnfdr27 before applying.
+#       Run on each node:
+#         lscpu
+#         lscpu -e
+#         cat /sys/devices/system/node/node*/cpulist
+#       Then adjust reserved/isolated CPU sets accordingly.
+#
+# TODO: Verify NUMA node of the Mellanox NIC:
+#         cat /sys/bus/pci/devices/0000:c0:00.0/numa_node  (cnfdr26)
+#         cat /sys/bus/pci/devices/0000:98:00.0/numa_node  (cnfdr27)
+#       Isolated CPUs should be on the same NUMA node as the NIC for best performance.
+#
+# The values below are a conservative placeholder (reserve first 4 HT pairs).
+apiVersion: performance.openshift.io/v2
+kind: PerformanceProfile
+metadata:
+  name: grout-performance
+spec:
+  cpu:
+    reserved: "0-3,64-67"
+    isolated: "4-63,68-127"
+  hugepages:
+    defaultHugepagesSize: 1G
+    pages:
+      - size: 1G
+        count: 16
+  numa:
+    topologyPolicy: single-numa-node
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  realTimeKernel:
+    enabled: false

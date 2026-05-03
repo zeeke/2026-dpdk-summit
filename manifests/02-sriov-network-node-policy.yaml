@@ -1,0 +1,34 @@
+---
+# cnfdr26: Mellanox ConnectX-6 Dx, PF ens7f0np0 (PCI 0000:c0:00.0)
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: grout-vfs-cnfdr26
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: netdevice
+  isRdma: true
+  nicSelector:
+    pfNames:
+      - "ens7f0np0"
+  numVfs: 16
+  resourceName: ens7f0vfs
+  nodeSelector:
+    kubernetes.io/hostname: cnfdr26.telco5g.eng.rdu2.redhat.com
+---
+# cnfdr27: Mellanox ConnectX-6 Dx, PF ens6f0np0 (PCI 0000:98:00.0)
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: grout-vfs-cnfdr27
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: netdevice
+  isRdma: true
+  nicSelector:
+    pfNames:
+      - "ens6f0np0"
+  numVfs: 16
+  resourceName: ens6f0vfs
+  nodeSelector:
+    kubernetes.io/hostname: cnfdr27.telco5g.eng.rdu2.redhat.com

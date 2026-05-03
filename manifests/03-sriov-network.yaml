@@ -1,0 +1,52 @@
+---
+# Network A (10.56.217.0/24) — cnfdr26 VFs
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: net-a-cnfdr26
+  namespace: openshift-sriov-network-operator
+spec:
+  ipam: '{"type": "host-local", "subnet": "192.168.1.0/24"}'
+  networkNamespace: grout
+  resourceName: ens7f0vfs
+  spoofChk: "off"
+  trust: "on"
+---
+# Network B (10.56.218.0/24) — cnfdr26 VFs
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: net-b-cnfdr26
+  namespace: openshift-sriov-network-operator
+spec:
+  ipam: '{"type": "host-local", "subnet": "192.168.2.0/24"}'
+  networkNamespace: grout
+  resourceName: ens7f0vfs
+  spoofChk: "off"
+  trust: "on"
+---
+# Network A (10.56.217.0/24) — cnfdr27 VFs
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: net-a-cnfdr27
+  namespace: openshift-sriov-network-operator
+spec:
+  ipam: '{"type": "host-local", "subnet": "192.168.1.0/24"}'
+  networkNamespace: grout
+  resourceName: ens6f0vfs
+  spoofChk: "off"
+  trust: "on"
+---
+# Network B (10.56.218.0/24) — cnfdr27 VFs
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: net-b-cnfdr27
+  namespace: openshift-sriov-network-operator
+spec:
+  ipam: '{"type": "host-local", "subnet": "192.168.2.0/24"}'
+  networkNamespace: grout
+  resourceName: ens6f0vfs
+  spoofChk: "off"
+  trust: "on"

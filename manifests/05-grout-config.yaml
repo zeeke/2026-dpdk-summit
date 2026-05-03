@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grout-config
+  namespace: grout
+data:
+  grout.init: |
+    # Grout L3 forwarding configuration (two-node setup)
+    #
+    # VF PCI addresses are resolved at startup from:
+    #   PCIDEVICE_OPENSHIFT_IO_ENS7F0VFS = comma-separated PCI addrs of allocated VFs
+
+    interface add port p0 devargs __VF0__ rxqs 1 qsize 2048
+    interface add port p1 devargs __VF1__ rxqs 1 qsize 2048
+
+    address add 192.168.1.10/24 iface p0
+    address add 192.168.2.10/24 iface p1
+
+    route add 192.168.1.0/24 via 192.168.1.20
+    route add 192.168.2.0/24 via 192.168.2.20
+  start.sh: |
+    #!/bin/bash
+    VF0=$(echo "$PCIDEVICE_OPENSHIFT_IO_ENS7F0VFS" | cut -d, -f1)
+    VF1=$(echo "$PCIDEVICE_OPENSHIFT_IO_ENS7F0VFS" | cut -d, -f2)
+    sed "s/__VF0__/$VF0/g; s/__VF1__/$VF1/g" /etc/grout/grout.init > /etc/grout.init
+    exec /usr/bin/grout "$@"

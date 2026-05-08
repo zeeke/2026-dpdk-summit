@@ -10,14 +10,16 @@ data:
     # VF PCI addresses are resolved at startup from:
     #   PCIDEVICE_OPENSHIFT_IO_ENS7F0VFS = comma-separated PCI addrs of allocated VFs
 
-    interface add port p0 devargs __VF0__ rxqs 1 qsize 2048
-    interface add port p1 devargs __VF1__ rxqs 1 qsize 2048
+    interface add port p0 devargs __VF0__ rxqs 4 qsize 2048
+    interface add port p1 devargs __VF1__ rxqs 4 qsize 2048
 
     address add 192.168.1.10/24 iface p0
     address add 192.168.2.10/24 iface p1
 
-    route add 192.168.1.0/24 via 192.168.1.20
-    route add 192.168.2.0/24 via 192.168.2.20
+    nexthop add l3 iface p0 addr 192.168.1.100 mac __TREX_VF0_MAC__
+    nexthop add l3 iface p1 addr 192.168.2.100 mac __TREX_VF1_MAC__
+    route add 16.0.0.0/16 via 192.168.1.100
+    route add 48.0.0.0/16 via 192.168.2.100
   start.sh: |
     #!/bin/bash
     VF0=$(echo "$PCIDEVICE_OPENSHIFT_IO_ENS7F0VFS" | cut -d, -f1)

@@ -41,7 +41,7 @@ oc wait --for=condition=Available csv \
 The Node Tuning Operator is installed by default on OpenShift. Verify:
 
 ```bash
- oc get clusteroperators.config.openshift.io | grep tuning
+oc get clusteroperators.config.openshift.io | grep tuning
 ```
 
 ## 2. Create the Namespace
@@ -109,8 +109,9 @@ oc wait mcp worker --for condition=Updated --timeout=1800s
 Edit `manifests/05-grout-config.yaml` if you need different subnets. The default config sets up:
 - p0: 192.168.1.10/24
 - p1: 192.168.2.10/24
+- Static nexthops and routes for TRex traffic (16.0.0.0/16 <-> 48.0.0.0/16)
 
-The `__VF0__` and `__VF1__` placeholders are automatically resolved at pod startup.
+The `__VF0__`, `__VF1__`, `__TREX_VF0_MAC__`, and `__TREX_VF1_MAC__` placeholders are automatically resolved at pod startup from environment variables.
 
 ```bash
 oc apply -f manifests/05-grout-config.yaml
@@ -123,6 +124,7 @@ Edit `manifests/06-grout-pod.yaml`:
 - **`nodeSelector`**: set to your DUT (Device Under Test) node
 - **`k8s.v1.cni.cncf.io/networks`**: match the SriovNetwork names for this node
 - **`openshift.io/<resourceName>`**: match the SR-IOV resource name
+- **`TREX_VF0_MAC`** / **`TREX_VF1_MAC`**: set to the TRex pod's VF MACs (discover by deploying the TRex pod first and checking its network-status annotation)
 
 ```bash
 oc apply -f manifests/06-grout-pod.yaml
@@ -139,47 +141,20 @@ oc exec -n grout grout -- grcli route show
 
 ## 7. Deploy the Traffic Generator
 
-Choose one: **testpmd** (simpler) or **TRex** (more features).
-
-### Option A: testpmd
-
-Edit `manifests/07-trafficgen-testpmd.yaml`:
+Edit `manifests/07-trafficgen-trex.yaml`:
 
 - **`nodeSelector`**: set to your traffic generator node
 - **`k8s.v1.cni.cncf.io/networks`**: match the SriovNetwork names for this node
-
-```bash
-oc apply -f manifests/07-trafficgen-testpmd.yaml
-```
-
-Run traffic (exec into the pod):
-
-```bash
-oc exec -it -n grout testpmd -- bash
-
-# Discover VF PCI addresses
-env | grep PCIDEVICE
-
-# Generate traffic at 64B toward grout
-testpmd -l 0-3 -n 4 --socket-mem 1024 \
-  -a <VF0_PCI> \
-  -- --forward-mode=txonly --txpkts=64 --stats-period=5
-```
-
-### Option B: TRex
-
-Edit `manifests/08-trafficgen-trex.yaml`:
-
-- Update PCI address placeholders in the TRex config
+- **`GROUT_P0_MAC`** / **`GROUT_P1_MAC`**: set to grout's port MACs (from `grcli interface show`)
 - Adjust IP addresses if using different subnets
 
 ```bash
-oc apply -f manifests/08-trafficgen-trex.yaml
+oc apply -f manifests/07-trafficgen-trex.yaml
 ```
 
 ## 8. Verify Connectivity
 
-From a helper pod or the testpmd pod, ping through grout:
+From a helper pod or the TRex pod, ping through grout:
 
 ```bash
 ping 192.168.2.10   # grout's p1 address
@@ -204,10 +179,9 @@ Compute the delta between samples to get packets-per-second and bytes-per-second
 
 | Parameter | File | What to Change |
 |-----------|------|----------------|
-| Node hostnames | 02, 06, 07, 08 | `nodeSelector` and network annotation names |
+| Node hostnames | 02, 06, 07 | `nodeSelector` and network annotation names |
 | NIC PF name | 02 | `pfNames` in SriovNetworkNodePolicy |
 | CPU topology | 04 | `reserved` / `isolated` CPU sets |
 | Hugepages count | 04 | `pages.count` |
-| IP subnets | 03, 05, 08 | Subnet in IPAM config, grout.init, TRex profile |
-| Packet sizes | (runtime) | `--txpkts` flag in testpmd |
+| IP subnets | 03, 05, 07 | Subnet in IPAM config, grout.init, TRex profile |
 | RX queue count | 05 | `rxqs` in grout.init |

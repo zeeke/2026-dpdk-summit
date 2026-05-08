@@ -6,8 +6,8 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/networks: |-
       [
-        {"name": "net-a-cnfdr26", "namespace": "grout"},
-        {"name": "net-b-cnfdr26", "namespace": "grout"}
+        {"name": "net-a-cnfdr26", "namespace": "grout", "mac": "20:00:00:00:01:00"},
+        {"name": "net-b-cnfdr26", "namespace": "grout", "mac": "20:00:00:00:02:00"}
       ]
     cpu-load-balancing.crio.io: "disable"
     cpu-quota.crio.io: "disable"
@@ -24,7 +24,7 @@ spec:
         - |
           VF0=$(echo "$PCIDEVICE_OPENSHIFT_IO_ENS7F0VFS" | cut -d, -f1)
           VF1=$(echo "$PCIDEVICE_OPENSHIFT_IO_ENS7F0VFS" | cut -d, -f2)
-          sed "s/__VF0__/$VF0/g; s/__VF1__/$VF1/g" /etc/grout/grout.init > /tmp/grout.init
+          sed "s/__VF0__/$VF0/g; s/__VF1__/$VF1/g; s/__TREX_VF0_MAC__/$TREX_VF0_MAC/g; s/__TREX_VF1_MAC__/$TREX_VF1_MAC/g" /etc/grout/grout.init > /tmp/grout.init
           /usr/bin/grout -v &
           GROUT_PID=$!
           until [ -S /run/grout.sock ]; do sleep 0.1; done
@@ -32,6 +32,11 @@ spec:
             grcli $line
           done
           wait $GROUT_PID
+      env:
+        - name: TREX_VF0_MAC
+          value: "20:00:00:00:01:01"
+        - name: TREX_VF1_MAC
+          value: "20:00:00:00:02:01"
       securityContext:
         privileged: true
         runAsUser: 0
@@ -43,12 +48,12 @@ spec:
             - NET_RAW
       resources:
         requests:
-          cpu: "4"
+          cpu: "10"
           memory: 2Gi
           hugepages-1Gi: 2Gi
           openshift.io/ens7f0vfs: "2"
         limits:
-          cpu: "4"
+          cpu: "10"
           memory: 2Gi
           hugepages-1Gi: 2Gi
           openshift.io/ens7f0vfs: "2"

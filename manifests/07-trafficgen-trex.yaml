@@ -1,0 +1,157 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trex-config
+  namespace: grout
+data:
+  ipv4_profile.py: |
+    from trex_stl_lib.api import *
+
+    class Profile(object):
+        def get_streams(self, direction=0, tunables=(), **kwargs):
+            pad_size = int(kwargs.get("pad_size", 18))
+            if direction == 0:
+                src_ip, dst_ip = "16.0.0.1", "48.0.0.1"
+            else:
+                src_ip, dst_ip = "48.0.0.1", "16.0.0.1"
+
+            pkt = Ether() / IP(src=src_ip, dst=dst_ip) / UDP(dport=12, sport=1025) / ("\x00" * pad_size)
+
+            vm = STLScVmRaw([
+                STLVmFlowVar(name="src",
+                             min_value=src_ip, max_value=src_ip[:-1] + "254",
+                             size=4, op="inc"),
+                STLVmFlowVar(name="dst",
+                             min_value=dst_ip, max_value=dst_ip[:-1] + "254",
+                             size=4, op="inc"),
+                STLVmWrFlowVar(fv_name="src", pkt_offset="IP.src"),
+                STLVmWrFlowVar(fv_name="dst", pkt_offset="IP.dst"),
+                STLVmFixIpv4(offset="IP"),
+            ])
+
+            return [STLStream(packet=STLPktBuilder(pkt=pkt, vm=vm), mode=STLTXCont())]
+
+    def register():
+        return Profile()
+  start.sh: |
+    #!/bin/bash
+    set -e
+
+    ISOLATED=$(cat /sys/fs/cgroup/cpuset.cpus.isolated)
+    IFS=',' read -ra CPUS <<< "$ISOLATED"
+
+    MASTER=${CPUS[0]}
+    LATENCY=${CPUS[1]}
+    WORKERS=()
+    for i in "${!CPUS[@]}"; do
+      [ "$i" -le 1 ] && continue
+      WORKERS+=("${CPUS[$i]}")
+    done
+
+    VF0=$(echo "$PCIDEVICE_OPENSHIFT_IO_ENS6F0VFS" | cut -d, -f1)
+    VF1=$(echo "$PCIDEVICE_OPENSHIFT_IO_ENS6F0VFS" | cut -d, -f2)
+    # strip leading 0000: domain prefix for TRex
+    VF0_SHORT=${VF0#0000:}
+    VF1_SHORT=${VF1#0000:}
+
+    GROUT_P0_MAC=${GROUT_P0_MAC:-"unknown"}
+    GROUT_P1_MAC=${GROUT_P1_MAC:-"unknown"}
+
+    WORKER_LIST=$(IFS=,; echo "${WORKERS[*]}")
+
+    cat > /etc/trex_cfg.yaml << EOF
+    - version: 2
+      interfaces:
+        - "${VF0_SHORT}"
+        - "${VF1_SHORT}"
+      port_info:
+        - dest_mac: "${GROUT_P0_MAC}"
+        - dest_mac: "${GROUT_P1_MAC}"
+      c: ${#WORKERS[@]}
+      platform:
+        master_thread_id: ${MASTER}
+        latency_thread_id: ${LATENCY}
+        dual_if:
+          - socket: 1
+            threads: [${WORKER_LIST}]
+    EOF
+
+    echo "=== TRex config ==="
+    cat /etc/trex_cfg.yaml
+    echo "=== Starting TRex daemon ==="
+    cd /opt/trex
+    export LD_LIBRARY_PATH=$PWD
+    ./_t-rex-64 --cfg /etc/trex_cfg.yaml -i --no-scapy-server --mlx5-so &
+    TREX_PID=$!
+    echo "TRex PID: $TREX_PID"
+    wait $TREX_PID
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: trex
+  namespace: grout
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |-
+      [
+        {"name": "net-a-cnfdr27", "namespace": "grout", "mac": "20:00:00:00:01:01"},
+        {"name": "net-b-cnfdr27", "namespace": "grout", "mac": "20:00:00:00:02:01"}
+      ]
+    cpu-load-balancing.crio.io: "disable"
+    cpu-quota.crio.io: "disable"
+    irq-load-balancing.crio.io: "disable"
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: cnfdr27.telco5g.eng.rdu2.redhat.com
+  runtimeClassName: performance-grout-performance
+  containers:
+    - name: trex
+      image: quay.io/apanatto/trex:v3.06
+      command: ["sleep", "infinity"]
+      # To start TRex:
+      #   1. Run: bash /etc/trex/start.sh
+      #
+      # To run NDR binary search:
+      #   cd /opt/trex
+      #   cp /etc/trex/ipv4_profile.py .
+      #   ./ndr --stl -v --ports 0 1 -t 30 -ft 30 --force-map --bi-dir \
+      #     --pdr 0.000001 --profile ipv4_profile.py -o /tmp/ndr-results.json
+      env:
+        - name: GROUT_P0_MAC
+          value: "20:00:00:00:01:00"
+        - name: GROUT_P1_MAC
+          value: "20:00:00:00:02:00"
+      securityContext:
+        privileged: true
+        runAsUser: 0
+        capabilities:
+          add:
+            - IPC_LOCK
+            - SYS_RAWIO
+            - NET_ADMIN
+            - NET_RAW
+      resources:
+        requests:
+          cpu: "8"
+          memory: 2Gi
+          hugepages-1Gi: 2Gi
+          openshift.io/ens6f0vfs: "2"
+        limits:
+          cpu: "8"
+          memory: 2Gi
+          hugepages-1Gi: 2Gi
+          openshift.io/ens6f0vfs: "2"
+      volumeMounts:
+        - name: hugepages
+          mountPath: /dev/hugepages
+        - name: trex-config
+          mountPath: /etc/trex
+  volumes:
+    - name: hugepages
+      emptyDir:
+        medium: HugePages
+    - name: trex-config
+      configMap:
+        name: trex-config
+        defaultMode: 0755
+  terminationGracePeriodSeconds: 5

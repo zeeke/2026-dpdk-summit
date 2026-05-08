@@ -1,5 +1,5 @@
 ---
-# Network A (10.56.217.0/24) — cnfdr26 VFs
+# Network A (192.168.1.0/24) — cnfdr26 VFs
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetwork
 metadata:
@@ -12,7 +12,7 @@ spec:
   spoofChk: "off"
   trust: "on"
 ---
-# Network B (10.56.218.0/24) — cnfdr26 VFs
+# Network B (192.168.2.0/24) — cnfdr26 VFs
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetwork
 metadata:
@@ -25,7 +25,7 @@ spec:
   spoofChk: "off"
   trust: "on"
 ---
-# Network A (10.56.217.0/24) — cnfdr27 VFs
+# Network A (192.168.1.0/24) — cnfdr27 VFs
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetwork
 metadata:
@@ -38,7 +38,7 @@ spec:
   spoofChk: "off"
   trust: "on"
 ---
-# Network B (10.56.218.0/24) — cnfdr27 VFs
+# Network B (192.168.2.0/24) — cnfdr27 VFs
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetwork
 metadata:
